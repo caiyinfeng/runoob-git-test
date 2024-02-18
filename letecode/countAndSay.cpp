@@ -1,0 +1,33 @@
+#include <iostream>
+using namespace std;
+class Solution {
+public:
+    string countAndSay(int n) {
+        string prev = "1";
+        for (int i = 2; i <= n; ++i) {
+            string curr = "";
+            int start = 0;
+            int pos = 0;
+
+            while (pos < prev.size()) {
+                while (pos < prev.size() && prev[pos] == prev[start]) {
+                    pos++;
+                }
+                curr += to_string(pos - start) + prev[start];
+                cout<<"i:"<<i<<" pos:"<<pos<<" start:"<<start<<" curr:"<<curr<<" prev:"<<prev<<endl;
+                start = pos;
+            }
+            prev = curr;
+        }
+        
+        return prev;
+    }
+};
+
+int main()
+{
+    int abc=10;
+    Solution aa;
+    string a=aa.countAndSay(abc);
+    cout<<"a:"<<a<<endl;
+}
