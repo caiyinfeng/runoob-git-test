@@ -1,53 +1,7 @@
 #include "scan_iden/scan_iden.h"
 #include <inttypes.h>
-#include <vector>
-#include "ceres/ceres.h"
 #include "math.h"
 #include <algorithm>
-
-struct CURVE_FITTING_COST
-{
-    CURVE_FITTING_COST(double x, double y) : x_(x), y_(y) {}
-
-    template <typename T>
-    bool operator()(const T *ab, T *residual) const
-    {
-        residual[0] = T(y_) - (ab[0] * T(x_) + ab[1]);
-        return true;
-    }
-
-    const double x_;
-    const double y_;
-};
-void CeresLineFit(std::vector<double> data_x, std::vector<double> data_y, unsigned long data_n, std::vector<double> &vResult)
-{
-    double ab[2] = {0, 0};
-    ceres::Problem problem;
-
-    for (unsigned long i = 0; i < data_n; i++)
-    {
-        problem.AddResidualBlock(
-            new ceres::AutoDiffCostFunction<CURVE_FITTING_COST, 1, 2>(
-                new CURVE_FITTING_COST(data_x[i], data_y[i])),
-            nullptr,
-            ab);
-    }
-
-    ceres::Solver::Options options;
-    options.linear_solver_type = ceres::DENSE_QR;
-    options.minimizer_progress_to_stdout = false;
-
-    ceres::Solver::Summary summary;
-    ceres::Solve(options, &problem, &summary);
-
-    vResult.push_back(ab[0]); // 斜率
-    vResult.push_back(ab[1]); // 截距
-}
-// 求点到直线的距离
-double get_distance(double x1, double y1, double x2, double y2,double x3,double y3)
-{
-    return abs((y1-y2)*x3+(x2-x1)*y3+x1*y2-y1*x2)/sqrt((y1-y2) *(y1-y2)+(x1-x2)*(x1-x2));
-}
 Point Scan_Iden::laser_segmentation2(std::vector<Point> point)
 {
     std::vector<double> dx, dy, dx_qian10, dy_qian10, dx_hou10, dy_hou10;
@@ -209,7 +163,6 @@ void Scan_Iden::laser_callback(sensor_msgs::LaserScan::ConstPtr msg)
     change.range_min = msg->range_min;
     change.scan_time = msg->scan_time;
     change.time_increment = msg->time_increment;
-    // ROS_INFO("SUCESS!");
     std::vector<float> changes(msg->ranges.size() + 1, NAN);
     double x_qian=0, y_qian=0, x_save=0, y_save=0; //
     int count1 = 0, count2 = 0, count3 = 0;
@@ -223,7 +176,6 @@ void Scan_Iden::laser_callback(sensor_msgs::LaserScan::ConstPtr msg)
     std::vector<double> Photovoltaic_Panels_x, Photovoltaic_Panels_y;
     std::vector<Point> point;
     std::vector<std::vector<Point>> save_points;
-    // ROS_INFO("SUCESS!2");
     for (int i = 0.1 * msg->ranges.size(); i <= msg->ranges.size(); ++i)
     {
         if (i - save_i == 11 || i == msg->ranges.size() || count3 == 4||point_clean)
@@ -236,14 +188,10 @@ void Scan_Iden::laser_callback(sensor_msgs::LaserScan::ConstPtr msg)
             }
             if (count3 == 4)
             {
-                //ROS_INFO("count3 == 4");
-                //std::cout << "point:" << point.size() << std::endl;
                 dis_more = false;
                 if (point.size() > 3)
                 {
-                    auto first_iterator = std::prev(point.end(), 3); // 倒数第三个迭代器
-                    auto last_iterator = point.end();                // 倒数第二个迭代器
-                    point_save.assign(first_iterator, last_iterator);
+                    point_save=prev_vector(point,3);
                 }
             }
             count3 = 0;
@@ -270,8 +218,6 @@ void Scan_Iden::laser_callback(sensor_msgs::LaserScan::ConstPtr msg)
         }
         else if (msg->ranges[i] > 0.3)
         {
-            // changes[i]=msg->ranges[i];
-            // std::cout<<msg->ranges[i]<<std::endl;
             count1++;
             double angle = msg->angle_min + msg->angle_increment * (i - 1);
             double x = msg->ranges[i] * cos(angle), y = msg->ranges[i] * sin(angle);
@@ -316,13 +262,7 @@ void Scan_Iden::laser_callback(sensor_msgs::LaserScan::ConstPtr msg)
                 break;
             if (Photovoltaic_Panels_x.size() > 100)
             {
-                std::vector<double> point_save_x, point_save_y;
-                auto first_iterator = std::prev(Photovoltaic_Panels_x.end(), 15); // 倒数第15个迭代器
-                auto last_iterator = Photovoltaic_Panels_x.end();
-                point_save_x.assign(first_iterator, last_iterator);
-                first_iterator = std::prev(Photovoltaic_Panels_y.end(), 15);
-                last_iterator = Photovoltaic_Panels_y.end();
-                point_save_y.assign(first_iterator, last_iterator);
+                std::vector<double> point_save_x=prev_vector(Photovoltaic_Panels_x,15), point_save_y=prev_vector(Photovoltaic_Panels_y,15);
                 std::vector<double> result;
                 CeresLineFit(point_save_x, point_save_y, point_save_y.size(), result);
                 double k = result[0], d = result[1];
